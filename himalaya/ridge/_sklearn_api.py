@@ -205,6 +205,18 @@ class Ridge(_BaseRidge):
             return r2_score(y_true[:, None], y_pred[:, None])[0]
         else:
             return r2_score(y_true, y_pred)
+    @force_cpu_backend
+    def assign(self, coef, intercept, X):
+        """Set the model parameters manually.
+        coef: array of shape (n_features) or (n_features, n_targets)
+        intercept: float or array of shape (n_targets, )
+        X : array of shape (n_samples, n_features)
+            Testing features or training features.
+        """
+        self.coef_ = coef
+        self.intercept_ = intercept
+        self.dtype_ = _get_string_dtype(X)
+        self.n_features_in_ = X.shape[1]
 
 
 class RidgeCV(Ridge):
@@ -327,6 +339,7 @@ class RidgeCV(Ridge):
         else:
             self.best_alphas_, self.coef_, self.cv_scores_ = tmp
 
+        
         self.cv_scores_ = self.cv_scores_[0]
 
         if ravel:

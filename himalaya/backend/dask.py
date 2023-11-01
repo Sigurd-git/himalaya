@@ -2,6 +2,7 @@
 
 To use this backend, call ``himalaya.backend.set_backend("numpy")``.
 """
+
 import numpy as np
 try:
     import scipy.linalg as linalg
@@ -46,27 +47,12 @@ def mean_float64(array, axis=None, keepdims=False):
     """
     return array.mean(axis, dtype=np.float64,
                       keepdims=keepdims).astype(array.dtype, copy=False)
-def nanstd_float64(array, axis=None, demean=True, keepdims=False):
-    """Compute the standard deviation of X with double precision,
-    and cast back the result to original dtype.
-    """
-    return np.nanstd(array,axis, dtype=np.float64,
-                     keepdims=keepdims).astype(array.dtype, copy=False)
-
-
-def nanmean_float64(array, axis=None, keepdims=False):
-    """Compute the mean of X with double precision,
-    and cast back the result to original dtype.
-    """
-    return np.nanmean(array,axis, dtype=np.float64,
-                      keepdims=keepdims).astype(array.dtype, copy=False)
 
 
 ###############################################################################
 
-name = "numpy"
+name = "dask"
 argmax = np.argmax
-nanargmax = np.nanargmax
 max = np.max
 min = np.min
 abs = np.abs
@@ -111,7 +97,6 @@ flip = np.flip
 atleast_1d = np.atleast_1d
 finfo = np.finfo
 eye = np.eye
-allclose = np.allclose
 
 
 def diagonal_view(array, axis1=0, axis2=1):

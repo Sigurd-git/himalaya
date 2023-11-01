@@ -97,7 +97,7 @@ flip = cupy.flip
 atleast_1d = cupy.atleast_1d
 finfo = cupy.finfo
 eye = cupy.eye
-
+allclose = cupy.allclose
 
 def diagonal_view(array, axis1=0, axis2=1):
     """Return a view of the array diagonal."""

@@ -391,14 +391,14 @@ def _select_best_alphas(scores, alphas, local_alpha, conservative):
     backend = get_backend()
 
     # average scores over splits
-    scores_mean = backend.mean_float64(scores, axis=0)
+    scores_mean = backend.nanmean_float64(scores, axis=0)
     # add epsilon slope to select larger alphas if scores are equal
-    scores_mean += (backend.log(alphas) * 1e-10)[:, None]
+    # scores_mean += (backend.log(alphas) * 1e-10)[:, None]
 
     # compute the max over alphas
     axis = 0
     if local_alpha:
-        alphas_argmax = backend.argmax(scores_mean, axis)
+        alphas_argmax = backend.nanargmax(scores_mean, axis)
 
         if conservative:
             # take a conservative alpha, the largest that beats the best
@@ -414,7 +414,7 @@ def _select_best_alphas(scores, alphas, local_alpha, conservative):
         if conservative:
             raise NotImplementedError()
         else:
-            alphas_argmax = backend.argmax(scores_mean.mean(1))
+            alphas_argmax = backend.nanargmax(scores_mean.mean(1))
             alphas_argmax = backend.full_like(alphas_argmax,
                                               shape=scores_mean.shape[1],
                                               fill_value=alphas_argmax)

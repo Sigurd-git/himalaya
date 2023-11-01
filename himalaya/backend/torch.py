@@ -67,6 +67,38 @@ def mean_float64(X, axis=None, keepdims=False):
         X_mean = X_mean.unsqueeze(dim=axis)
     return X_mean
 
+def nanstd_float64(X, axis=None, demean=True, keepdims=False):
+    """Compute the standard deviation of X with double precision,
+    and cast back the result to original dtype.
+    """
+    X_64 = torch.as_tensor(X, dtype=torch.float64)
+    X_std = (X_64 ** 2).nansum(dim=axis, dtype=torch.float64)
+    if demean:
+        X_std -= X_64.nansum(axis, dtype=torch.float64) ** 2 / X.shape[axis]
+    X_std = X_std ** .5
+    X_std /= (X.shape[axis] ** .5)
+
+    X_std = torch.as_tensor(X_std, dtype=X.dtype, device=X.device)
+    if keepdims:
+        X_std = X_std.unsqueeze(dim=axis)
+
+    return X_std
+
+
+def nanmean_float64(X, axis=None, keepdims=False):
+    """Compute the mean of X with double precision,
+    and cast back the result to original dtype.
+    """
+    X_mean = X.nansum(axis, dtype=torch.float64) / X.shape[axis]
+
+    X_mean = torch.as_tensor(X_mean, dtype=X.dtype, device=X.device)
+    if keepdims:
+        X_mean = X_mean.unsqueeze(dim=axis)
+    return X_mean
+def nanargmax(tensor, dim=None, keepdim=False):
+    min_value = torch.finfo(tensor.dtype).min
+    output = tensor.nan_to_num(min_value).argmax(dim=dim, keepdim=keepdim)
+    return output
 
 ###############################################################################
 
@@ -103,7 +135,7 @@ sign = torch.sign
 clip = torch.clamp
 finfo = torch.finfo
 eye = torch.eye
-
+allclose = torch.allclose
 
 def atleast_1d(array):
     array = asarray(array)

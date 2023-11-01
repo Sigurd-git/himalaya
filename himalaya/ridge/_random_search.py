@@ -1,6 +1,6 @@
 import warnings
 import numbers
-
+import dask.array as da
 import numpy as np
 
 from ..backend import get_backend
@@ -19,7 +19,7 @@ def solve_group_ridge_random_search(
     score_func=l2_neg_loss, cv=5, return_weights=False, local_alpha=True,
     jitter_alphas=False, random_state=None, n_targets_batch=None,
     n_targets_batch_refit=None, n_alphas_batch=None, progress_bar=True,
-    conservative=False, Y_in_cpu=False, diagonalize_method="svd", warn=True):
+    conservative=False, Y_in_cpu=False, diagonalize_method="svd", warn=True,nsample_large=False):
     """Solve group ridge regression using random search on the simplex.
 
     Solve the group-regularized ridge regression::
@@ -86,6 +86,10 @@ def solve_group_ridge_random_search(
     warn : bool
         If True, warn if the number of samples is smaller than the number of
         features.
+    nsample_large : bool
+        Compute (XTX + alphas * Id)^-1 @ Xtrain^T @ Ytrain first,
+        instead of Xtest @ (XTX + alphas * Id)^-1 @ Xtrain^T 
+        to same memory if n_samples is pretty large.
 
     Returns
     -------
@@ -218,30 +222,62 @@ def solve_group_ridge_random_search(
                     n_alphas_batch=n_alphas_batch, method=diagonalize_method):
                 # n_alphas_batch, n_features, n_samples_train = \
                 # matrix.shape
-                matrix = backend.matmul(Xtest, matrix)
-                # n_alphas_batch, n_samples_test, n_samples_train = \
-                # matrix.shape
+                if backend.name =='dask':
+                    matrix = da.from_array(matrix, chunks=(n_alphas_batch, n_features, '1000'))
+                if not nsample_large:
+                    matrix = backend.matmul(Xtest, matrix)
+                    # n_alphas_batch, n_samples_test, n_samples_train = \
+                    # matrix.shape
 
-                predictions = None
-                for start in range(0, n_targets, n_targets_batch):
-                    batch = slice(start, start + n_targets_batch)
-                    Ytrain = backend.to_gpu(Y[:, batch][train], device=device)
-                    Ytest = backend.to_gpu(Y[:, batch][test], device=device)
-                    if fit_intercept:
-                        Ytrain_mean = Ytrain.mean(0)
-                        Ytrain = Ytrain - Ytrain_mean
-                        Ytest = Ytest - Ytrain_mean
+                    predictions = None
+                    for start in range(0, n_targets, n_targets_batch):
+                        batch = slice(start, start + n_targets_batch)
+                        Ytrain = backend.to_gpu(Y[:, batch][train], device=device)
+                        Ytest = backend.to_gpu(Y[:, batch][test], device=device)
+                        if fit_intercept:
+                            Ytrain_mean = Ytrain.mean(0)
+                            Ytrain = Ytrain - Ytrain_mean
+                            Ytest = Ytest - Ytrain_mean
 
-                    predictions = backend.matmul(matrix, Ytrain)
-                    # n_alphas_batch, n_samples_test, n_targets_batch = \
-                    # predictions.shape
+                        predictions = backend.matmul(matrix, Ytrain)
+                        # n_alphas_batch, n_samples_test, n_targets_batch = \
+                        # predictions.shape
 
-                    with warnings.catch_warnings():
-                        warnings.filterwarnings("ignore", category=UserWarning)
-                        scores[jj, alpha_batch,
-                               batch] = score_func(Ytest, predictions)
-                        # n_alphas_batch, n_targets_batch = score.shape
-                    del Ytrain, Ytest
+                        with warnings.catch_warnings():
+                            warnings.filterwarnings("ignore", category=UserWarning)
+                            scores[jj, alpha_batch,
+                                batch] = score_func(Ytest, predictions)
+                            # n_alphas_batch, n_targets_batch = score.shape
+                        del Ytrain, Ytest
+                else:
+                    for start in range(0, n_targets, n_targets_batch):
+                        batch = slice(start, start + n_targets_batch)
+                        Ytrain = backend.to_gpu(Y[:, batch][train], device=device)
+                        Ytest = backend.to_gpu(Y[:, batch][test], device=device)
+                        if fit_intercept:
+                            Ytrain_mean = Ytrain.mean(0)
+                            Ytrain = Ytrain - Ytrain_mean
+                            Ytest = Ytest - Ytrain_mean
+
+                        predictions = backend.matmul(matrix, Ytrain)
+                        # n_alphas_batch, n_features, n_targets_batch = \
+                        # predictions.shape
+                        predictions = backend.matmul(Xtest,predictions)
+                        # n_alphas_batch, n_samples_test, n_targets_batch = \
+                        # predictions.shape
+                        with warnings.catch_warnings():
+                            warnings.filterwarnings("ignore", category=UserWarning)
+                            scores[jj, alpha_batch,
+                                batch] = score_func(Ytest, predictions)
+                            # n_alphas_batch, n_targets_batch = score.shape
+                        del Ytrain, Ytest
+                    
+                    
+
+                    # n_alphas_batch, n_samples_test, n_samples_train = \
+                    # matrix.shape
+
+
 
                 # make small alphas impossible to select
                 too_small_alphas = backend.isnan(matrix[:, 0, 0])
@@ -325,7 +361,11 @@ def solve_group_ridge_random_search(
 
         for kk in range(n_spaces):
             X_[:, slices[kk]] /= backend.sqrt(gamma[kk])
-
+            
+    #warning when best_alpha is at the edge of the range
+    for index, best_alpha in enumerate(best_alphas):
+        if backend.allclose(best_alpha,alphas[0]) or backend.allclose(best_alpha,alphas[-1]):
+            print(f'Warning: best alpha for target{index} is {best_alpha}, which is at the edge of the range')
     deltas = backend.log(best_gammas / best_alphas[None, :])
 
     if fit_intercept:
@@ -433,7 +473,7 @@ def solve_ridge_cv_svd(X, Y, alphas=1.0, fit_intercept=False,
                        score_func=l2_neg_loss, cv=5, local_alpha=True,
                        n_targets_batch=None, n_targets_batch_refit=None,
                        n_alphas_batch=None, conservative=False, Y_in_cpu=False,
-                       warn=True):
+                       warn=True,nsample_large=False):
     """Solve ridge regression with a grid search over alphas.
 
     Parameters
@@ -505,7 +545,7 @@ def solve_ridge_cv_svd(X, Y, alphas=1.0, fit_intercept=False,
                          n_targets_batch=n_targets_batch,
                          n_targets_batch_refit=n_targets_batch_refit,
                          n_alphas_batch=n_alphas_batch,
-                         conservative=conservative, Y_in_cpu=Y_in_cpu)
+                         conservative=conservative, Y_in_cpu=Y_in_cpu,nsample_large=nsample_large)
 
     tmp = solve_group_ridge_random_search([X], Y, **copied_params,
                                           **fixed_params)

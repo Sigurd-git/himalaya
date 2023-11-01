@@ -8,6 +8,7 @@ ALL_BACKENDS = [
     "cupy",
     "torch",
     "torch_cuda",
+    "dask"
 ]
 
 CURRENT_BACKEND = "numpy"
