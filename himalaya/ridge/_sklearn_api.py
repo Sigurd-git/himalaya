@@ -172,6 +172,7 @@ class Ridge(_BaseRidge):
         check_is_fitted(self)
         backend = get_backend()
         X = check_array(X, dtype=self.dtype_, ndim=2)
+        self.coef_ = check_array(self.coef_, dtype=self.dtype_, ndim=2)
         if X.shape[1] != self.n_features_in_:
             raise ValueError(
                 'Different number of features in X than during fit.')
@@ -213,9 +214,9 @@ class Ridge(_BaseRidge):
         X : array of shape (n_samples, n_features)
             Testing features or training features.
         """
-        self.coef_ = coef
-        self.intercept_ = intercept
         self.dtype_ = _get_string_dtype(X)
+        self.coef_ = check_array(coef, dtype=self.dtype_, ndim=2)
+        self.intercept_ = check_array(intercept, dtype=self.dtype_, ndim=1)
         self.n_features_in_ = X.shape[1]
 
 

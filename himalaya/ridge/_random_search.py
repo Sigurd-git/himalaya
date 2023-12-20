@@ -364,6 +364,7 @@ def solve_group_ridge_random_search(
             
     #warning when best_alpha is at the edge of the range
     for index, best_alpha in enumerate(best_alphas):
+        #TODO: not allclose, should be relative
         if backend.allclose(best_alpha,alphas[0]) or backend.allclose(best_alpha,alphas[-1]):
             print(f'Warning: best alpha for target{index} is {best_alpha}, which is at the edge of the range')
     deltas = backend.log(best_gammas / best_alphas[None, :])
