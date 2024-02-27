@@ -403,14 +403,12 @@ def solve_group_ridge_random_search(
     deltas = backend.log(best_gammas / best_alphas[None, :])
 
     if fit_intercept:
-        intercept = (
-            (backend.to_cpu(Y_offset) - backend.to_cpu(X_offset) @ refit_weights)
-            if return_weights
-            else None
-        )
-        return deltas, refit_weights, cv_scores, intercept
+        intercept = (backend.to_cpu(Y_offset) -
+                     backend.to_cpu(X_offset) @ refit_weights
+                     ) if return_weights else None
+        return deltas, refit_weights, scores, intercept,
     else:
-        return deltas, refit_weights, cv_scores
+        return deltas, refit_weights,scores
 
 
 def _decompose_ridge(
@@ -616,10 +614,10 @@ def solve_ridge_cv_svd(
     tmp = solve_group_ridge_random_search([X], Y, **copied_params, **fixed_params)
 
     if fit_intercept:
-        deltas, coefs, cv_scores, intercept = tmp
+        deltas, coefs, scores, intercept, = tmp
         best_alphas = backend.exp(-deltas[0])
-        return best_alphas, coefs, cv_scores, intercept
+        return best_alphas, coefs, scores, intercept
     else:
-        deltas, coefs, cv_scores = tmp
+        deltas, coefs, scores = tmp
         best_alphas = backend.exp(-deltas[0])
-        return best_alphas, coefs, cv_scores
+        return best_alphas, coefs,scores

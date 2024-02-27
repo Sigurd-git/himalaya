@@ -33,18 +33,18 @@ class _BaseRidge(ABC, MultiOutputMixin, RegressorMixin, BaseEstimator):
         solver_params = self.solver_params or {}
 
         # check duplicated parameters
-        intersection = set(direct_params.keys()).intersection(
-            set(solver_params.keys()))
+        intersection = set(direct_params.keys()).intersection(set(solver_params.keys()))
         if intersection:
             raise ValueError(
-                'Parameters %s should not be given in solver_params, since '
-                'they are either fixed or have a direct parameter in %s.' %
-                (intersection, self.__class__.__name__))
+                "Parameters %s should not be given in solver_params, since "
+                "they are either fixed or have a direct parameter in %s."
+                % (intersection, self.__class__.__name__)
+            )
 
         return function(**direct_params, **solver_params)
 
     def _more_tags(self):
-        return {'requires_y': True}
+        return {"requires_y": True}
 
 
 class Ridge(_BaseRidge):
@@ -100,10 +100,17 @@ class Ridge(_BaseRidge):
     >>> model.fit(X, Y)
     Ridge()
     """
+
     ALL_SOLVERS = RIDGE_SOLVERS
 
-    def __init__(self, alpha=1, fit_intercept=False, solver="svd",
-                 solver_params=None, force_cpu=False):
+    def __init__(
+        self,
+        alpha=1,
+        fit_intercept=False,
+        solver="svd",
+        solver_params=None,
+        force_cpu=False,
+    ):
         self.alpha = alpha
         self.fit_intercept = fit_intercept
         self.solver = solver
@@ -141,8 +148,9 @@ class Ridge(_BaseRidge):
             ravel = True
 
         # ------------------ call the solver
-        tmp = self._call_solver(X=X, Y=y, alpha=self.alpha,
-                                fit_intercept=self.fit_intercept)
+        tmp = self._call_solver(
+            X=X, Y=y, alpha=self.alpha, fit_intercept=self.fit_intercept
+        )
         if self.fit_intercept:
             self.coef_, self.intercept_ = tmp
         else:
@@ -174,8 +182,7 @@ class Ridge(_BaseRidge):
         X = check_array(X, dtype=self.dtype_, ndim=2)
         self.coef_ = check_array(self.coef_, dtype=self.dtype_, ndim=2)
         if X.shape[1] != self.n_features_in_:
-            raise ValueError(
-                'Different number of features in X than during fit.')
+            raise ValueError("Different number of features in X than during fit.")
 
         Y_hat = backend.to_cpu(X) @ backend.to_cpu(self.coef_)
         if self.fit_intercept:
@@ -206,18 +213,25 @@ class Ridge(_BaseRidge):
             return r2_score(y_true[:, None], y_pred[:, None])[0]
         else:
             return r2_score(y_true, y_pred)
+
     @force_cpu_backend
-    def assign(self, coef, intercept, X):
+    def assign(self, coef, intercept, X=None, dtype=None, n_features_in=None):
         """Set the model parameters manually.
         coef: array of shape (n_features) or (n_features, n_targets)
         intercept: float or array of shape (n_targets, )
         X : array of shape (n_samples, n_features)
             Testing features or training features.
         """
-        self.dtype_ = _get_string_dtype(X)
+        if X is not None:
+            self.dtype_ = _get_string_dtype(X)
+            self.n_features_in_ = X.shape[1]
+        else:
+            assert dtype is not None, "dtype must be given if X is None"
+            assert n_features_in is not None, "n_features_in must be given if X is None"
+            self.dtype_ = dtype
+            self.n_features_in_ = n_features_in
         self.coef_ = check_array(coef, dtype=self.dtype_, ndim=2)
         self.intercept_ = check_array(intercept, dtype=self.dtype_, ndim=1)
-        self.n_features_in_ = X.shape[1]
 
 
 class RidgeCV(Ridge):
@@ -284,10 +298,19 @@ class RidgeCV(Ridge):
     >>> clf.fit(X, Y)
     RidgeCV()
     """
+
     ALL_SOLVERS = dict(svd=solve_ridge_cv_svd)
 
-    def __init__(self, alphas=[0.1, 1], fit_intercept=False, solver="svd",
-                 solver_params=None, cv=5, Y_in_cpu=False, force_cpu=False):
+    def __init__(
+        self,
+        alphas=[0.1, 1],
+        fit_intercept=False,
+        solver="svd",
+        solver_params=None,
+        cv=5,
+        Y_in_cpu=False,
+        force_cpu=False,
+    ):
         self.alphas = alphas
         self.fit_intercept = fit_intercept
         self.solver = solver
@@ -331,17 +354,18 @@ class RidgeCV(Ridge):
         cv = check_cv(self.cv, y)
 
         # ------------------ call the solver
-        tmp = self._call_solver(X=X, Y=y, cv=cv, alphas=alphas,
-                                fit_intercept=self.fit_intercept,
-                                Y_in_cpu=self.Y_in_cpu)
+        tmp = self._call_solver(
+            X=X,
+            Y=y,
+            cv=cv,
+            alphas=alphas,
+            fit_intercept=self.fit_intercept,
+            Y_in_cpu=self.Y_in_cpu,
+        )
         if self.fit_intercept:
-            self.best_alphas_, self.coef_, self.cv_scores_ = tmp[:3]
-            self.intercept_, = tmp[3:]
+            self.best_alphas_, self.coef_, self.cv_scores_,self.intercept_ = tmp
         else:
             self.best_alphas_, self.coef_, self.cv_scores_ = tmp
-
-        
-        self.cv_scores_ = self.cv_scores_[0]
 
         if ravel:
             self.coef_ = self.coef_[:, 0]
@@ -456,12 +480,20 @@ class GroupRidgeCV(_BaseRidge):
     >>> pipe = make_pipeline(ct, model)
     >>> _ = pipe.fit(X, Y)
     """
+
     ALL_SOLVERS = GROUP_RIDGE_SOLVERS
 
-    def __init__(self, groups=None, solver="random_search", solver_params=None,
-                 fit_intercept=False, cv=5, random_state=None, Y_in_cpu=False,
-                 force_cpu=False):
-
+    def __init__(
+        self,
+        groups=None,
+        solver="random_search",
+        solver_params=None,
+        fit_intercept=False,
+        cv=5,
+        random_state=None,
+        Y_in_cpu=False,
+        force_cpu=False,
+    ):
         self.groups = groups
         self.solver = solver
         self.solver_params = solver_params
@@ -512,18 +544,23 @@ class GroupRidgeCV(_BaseRidge):
         cv = check_cv(self.cv, y)
 
         # ------------------ call the solver
-        tmp = self._call_solver(Xs=Xs, Y=y, cv=cv, return_weights=True,
-                                random_state=self.random_state,
-                                fit_intercept=self.fit_intercept,
-                                Y_in_cpu=self.Y_in_cpu)
+        tmp = self._call_solver(
+            Xs=Xs,
+            Y=y,
+            cv=cv,
+            return_weights=True,
+            random_state=self.random_state,
+            fit_intercept=self.fit_intercept,
+            Y_in_cpu=self.Y_in_cpu,
+        )
         if self.fit_intercept:
             self.deltas_, self.coef_, self.cv_scores_ = tmp[:3]
-            self.intercept_, = tmp[3:]
+            (self.intercept_,) = tmp[3:]
         else:
             self.deltas_, self.coef_, self.cv_scores_ = tmp
 
         if self.solver == "random_search":
-            self.best_alphas_ = 1. / backend.exp(self.deltas_).sum(0)
+            self.best_alphas_ = 1.0 / backend.exp(self.deltas_).sum(0)
         else:
             self.best_alphas_ = None
 
@@ -566,24 +603,23 @@ class GroupRidgeCV(_BaseRidge):
 
         n_features = sum(Xi.shape[1] for Xi in Xs)
         if n_features != self.n_features_in_:
-            raise ValueError(
-                'Different number of features in X than during fit.')
+            raise ValueError("Different number of features in X than during fit.")
         if split:
             if self.fit_intercept:
                 raise NotImplementedError(
                     "Splitting the predictions is not implemented with "
-                    "fit_intercept=True.")
+                    "fit_intercept=True."
+                )
 
             start = 0
             Ys_hat = None
             for ii, X_i in enumerate(Xs):
                 n_features_i = X_i.shape[1]
-                coef = self.coef_[start:start + n_features_i]
+                coef = self.coef_[start : start + n_features_i]
                 start += n_features_i
                 Y_hat = backend.to_cpu(X_i) @ backend.to_cpu(coef)
                 if Ys_hat is None:
-                    Ys_hat = backend.zeros_like(Y_hat,
-                                                shape=(len(Xs), *Y_hat.shape))
+                    Ys_hat = backend.zeros_like(Y_hat, shape=(len(Xs), *Y_hat.shape))
                 Ys_hat[ii] = Y_hat
             return Ys_hat
 
