@@ -14,12 +14,28 @@ from ..kernel_ridge._random_search import _select_best_alphas
 
 
 def solve_group_ridge_random_search(
-    Xs, Y, n_iter=100, concentration=[0.1,
-                                      1.0], alphas=1.0, fit_intercept=False,
-    score_func=l2_neg_loss, cv=5, return_weights=False, local_alpha=True,
-    jitter_alphas=False, random_state=None, n_targets_batch=None,
-    n_targets_batch_refit=None, n_alphas_batch=None, progress_bar=True,
-    conservative=False, Y_in_cpu=False, diagonalize_method="svd", warn=True,nsample_large=False):
+    Xs,
+    Y,
+    n_iter=100,
+    concentration=[0.1, 1.0],
+    alphas=1.0,
+    fit_intercept=False,
+    score_func=l2_neg_loss,
+    cv=5,
+    return_weights=False,
+    local_alpha=True,
+    jitter_alphas=False,
+    random_state=None,
+    n_targets_batch=None,
+    n_targets_batch_refit=None,
+    n_alphas_batch=None,
+    progress_bar=True,
+    conservative=False,
+    Y_in_cpu=False,
+    diagonalize_method="svd",
+    warn=True,
+    nsample_large=False,
+):
     """Solve group ridge regression using random search on the simplex.
 
     Solve the group-regularized ridge regression::
@@ -88,7 +104,7 @@ def solve_group_ridge_random_search(
         features.
     nsample_large : bool
         Compute (XTX + alphas * Id)^-1 @ Xtrain^T @ Ytrain first,
-        instead of Xtest @ (XTX + alphas * Id)^-1 @ Xtrain^T 
+        instead of Xtest @ (XTX + alphas * Id)^-1 @ Xtrain^T
         to same memory if n_samples is pretty large.
 
     Returns
@@ -107,19 +123,21 @@ def solve_group_ridge_random_search(
     backend = get_backend()
     n_spaces = len(Xs)
     if isinstance(n_iter, int):
-        gammas = generate_dirichlet_samples(n_samples=n_iter,
-                                            n_kernels=n_spaces,
-                                            concentration=concentration,
-                                            random_state=random_state)
+        gammas = generate_dirichlet_samples(
+            n_samples=n_iter,
+            n_kernels=n_spaces,
+            concentration=concentration,
+            random_state=random_state,
+        )
         gammas[0] = 1 / n_spaces
     elif n_iter.ndim == 2:
         gammas = n_iter
         assert gammas.shape[1] == n_spaces
     else:
-        raise ValueError("Unknown parameter n_iter=%r." % (n_iter, ))
+        raise ValueError("Unknown parameter n_iter=%r." % (n_iter,))
 
     if isinstance(alphas, numbers.Number) or alphas.ndim == 0:
-        alphas = backend.ones_like(Y, shape=(1, )) * alphas
+        alphas = backend.ones_like(Y, shape=(1,)) * alphas
 
     dtype = Xs[0].dtype
     gammas = backend.asarray(gammas, dtype=dtype)
@@ -134,8 +152,7 @@ def solve_group_ridge_random_search(
     n_features = X_.shape[1]
     start_and_end = np.concatenate([[0], np.cumsum(n_features_list)])
     slices = [
-        slice(start, end)
-        for start, end in zip(start_and_end[:-1], start_and_end[1:])
+        slice(start, end) for start, end in zip(start_and_end[:-1], start_and_end[1:])
     ]
     del Xs
 
@@ -148,7 +165,8 @@ def solve_group_ridge_random_search(
             "himalaya.kernel_ridge.MultipleKernelRidgeCV or "
             "himalaya.kernel_ridge.solve_multiple_kernel_ridge_random_search "
             "would be faster. Use warn=False to silence this warning.",
-            UserWarning)
+            UserWarning,
+        )
     if X_.shape[0] != Y.shape[0]:
         raise ValueError("X and Y must have the same number of samples.")
 
@@ -171,33 +189,35 @@ def solve_group_ridge_random_search(
     n_splits = cv.get_n_splits()
     for train, val in cv.split(Y):
         if len(val) == 0 or len(train) == 0:
-            raise ValueError("Empty train or validation set. "
-                             "Check that `cv` is correctly defined.")
+            raise ValueError(
+                "Empty train or validation set. "
+                "Check that `cv` is correctly defined."
+            )
 
     random_generator, given_alphas = None, None
     if jitter_alphas:
         random_generator = check_random_state(random_state)
         given_alphas = backend.copy(alphas)
 
-    best_gammas = backend.full_like(gammas, fill_value=1.0 / n_spaces,
-                                    shape=(n_spaces, n_targets))
+    best_gammas = backend.full_like(
+        gammas, fill_value=1.0 / n_spaces, shape=(n_spaces, n_targets)
+    )
     best_alphas = backend.ones_like(gammas, shape=n_targets)
-    cv_scores = backend.zeros_like(gammas, shape=(len(gammas), n_targets),
-                                   device="cpu")
-    current_best_scores = backend.full_like(gammas, fill_value=-backend.inf,
-                                            shape=n_targets)
+    cv_scores = backend.zeros_like(gammas, shape=(len(gammas), n_targets), device="cpu")
+    current_best_scores = backend.full_like(
+        gammas, fill_value=-backend.inf, shape=n_targets
+    )
 
     # initialize refit ridge weights
     refit_weights = None
     if return_weights:
-        refit_weights = backend.zeros_like(gammas,
-                                           shape=(n_features, n_targets),
-                                           device="cpu")
+        refit_weights = backend.zeros_like(
+            gammas, shape=(n_features, n_targets), device="cpu"
+        )
 
     for ii, gamma in enumerate(
-            bar(gammas, '%d random sampling with cv' % len(gammas),
-                use_it=progress_bar)):
-
+        bar(gammas, "%d random sampling with cv" % len(gammas), use_it=progress_bar)
+    ):
         for kk in range(n_spaces):
             X_[:, slices[kk]] *= backend.sqrt(gamma[kk])
 
@@ -205,8 +225,7 @@ def solve_group_ridge_random_search(
             noise = backend.asarray_like(random_generator.rand(), alphas)
             alphas = given_alphas * (10 ** (noise - 0.5))
 
-        scores = backend.zeros_like(gammas,
-                                    shape=(n_splits, len(alphas), n_targets))
+        scores = backend.zeros_like(gammas, shape=(n_splits, len(alphas), n_targets))
         for jj, (train, test) in enumerate(cv.split(X_)):
             train = backend.to_gpu(train, device=device)
             test = backend.to_gpu(test, device=device)
@@ -218,12 +237,18 @@ def solve_group_ridge_random_search(
                 Xtest = X_[test] - Xtrain_mean
 
             for matrix, alpha_batch in _decompose_ridge(
-                    Xtrain=Xtrain, alphas=alphas, negative_eigenvalues="nan",
-                    n_alphas_batch=n_alphas_batch, method=diagonalize_method):
+                Xtrain=Xtrain,
+                alphas=alphas,
+                negative_eigenvalues="nan",
+                n_alphas_batch=n_alphas_batch,
+                method=diagonalize_method,
+            ):
                 # n_alphas_batch, n_features, n_samples_train = \
                 # matrix.shape
-                if backend.name =='dask':
-                    matrix = da.from_array(matrix, chunks=(n_alphas_batch, n_features, '1000'))
+                if backend.name == "dask":
+                    matrix = da.from_array(
+                        matrix, chunks=(n_alphas_batch, n_features, "1000")
+                    )
                 if not nsample_large:
                     matrix = backend.matmul(Xtest, matrix)
                     # n_alphas_batch, n_samples_test, n_samples_train = \
@@ -245,8 +270,9 @@ def solve_group_ridge_random_search(
 
                         with warnings.catch_warnings():
                             warnings.filterwarnings("ignore", category=UserWarning)
-                            scores[jj, alpha_batch,
-                                batch] = score_func(Ytest, predictions)
+                            scores[jj, alpha_batch, batch] = score_func(
+                                Ytest, predictions
+                            )
                             # n_alphas_batch, n_targets_batch = score.shape
                         del Ytrain, Ytest
                 else:
@@ -262,22 +288,19 @@ def solve_group_ridge_random_search(
                         predictions = backend.matmul(matrix, Ytrain)
                         # n_alphas_batch, n_features, n_targets_batch = \
                         # predictions.shape
-                        predictions = backend.matmul(Xtest,predictions)
+                        predictions = backend.matmul(Xtest, predictions)
                         # n_alphas_batch, n_samples_test, n_targets_batch = \
                         # predictions.shape
                         with warnings.catch_warnings():
                             warnings.filterwarnings("ignore", category=UserWarning)
-                            scores[jj, alpha_batch,
-                                batch] = score_func(Ytest, predictions)
+                            scores[jj, alpha_batch, batch] = score_func(
+                                Ytest, predictions
+                            )
                             # n_alphas_batch, n_targets_batch = score.shape
                         del Ytrain, Ytest
-                    
-                    
 
                     # n_alphas_batch, n_samples_test, n_samples_train = \
                     # matrix.shape
-
-
 
                 # make small alphas impossible to select
                 too_small_alphas = backend.isnan(matrix[:, 0, 0])
@@ -288,7 +311,8 @@ def solve_group_ridge_random_search(
 
         # select best alphas
         alphas_argmax, cv_scores_ii = _select_best_alphas(
-            scores, alphas, local_alpha, conservative)
+            scores, alphas, local_alpha, conservative
+        )
         cv_scores[ii, :] = backend.to_cpu(cv_scores_ii)
 
         # update best_gammas and best_alphas
@@ -304,46 +328,50 @@ def solve_group_ridge_random_search(
             if Y_in_cpu:
                 update_indices = backend.to_cpu(update_indices)
             if len(update_indices) > 0:
-
                 # refit weights only for alphas used by at least one target
                 used_alphas = backend.unique(best_alphas[mask])
                 primal_weights = backend.zeros_like(
-                    X_, shape=(n_features, len(update_indices)), device="cpu")
+                    X_, shape=(n_features, len(update_indices)), device="cpu"
+                )
                 for matrix, alpha_batch in _decompose_ridge(
-                        Xtrain=X_, alphas=used_alphas,
-                        negative_eigenvalues="zeros",
-                        n_alphas_batch=min(len(used_alphas), n_alphas_batch),
-                        method=diagonalize_method):
-
-                    for start in range(0, len(update_indices),
-                                       n_targets_batch_refit):
+                    Xtrain=X_,
+                    alphas=used_alphas,
+                    negative_eigenvalues="zeros",
+                    n_alphas_batch=min(len(used_alphas), n_alphas_batch),
+                    method=diagonalize_method,
+                ):
+                    for start in range(0, len(update_indices), n_targets_batch_refit):
                         batch = slice(start, start + n_targets_batch_refit)
 
                         weights = backend.matmul(
                             matrix,
-                            backend.to_gpu(Y[:, update_indices[batch]],
-                                           device=device))
+                            backend.to_gpu(Y[:, update_indices[batch]], device=device),
+                        )
                         # used_n_alphas_batch, n_features, n_targets_batch = \
                         # weights.shape
 
                         # select alphas corresponding to best cv_score
                         alphas_indices = backend.searchsorted(
-                            used_alphas, best_alphas[mask][batch])
+                            used_alphas, best_alphas[mask][batch]
+                        )
                         # mask targets whose selected alphas are outside the
                         # alpha batch
                         mask2 = backend.isin(
                             alphas_indices,
-                            backend.arange(len(used_alphas))[alpha_batch])
+                            backend.arange(len(used_alphas))[alpha_batch],
+                        )
                         # get indices in alpha_batch
                         alphas_indices = backend.searchsorted(
                             backend.arange(len(used_alphas))[alpha_batch],
-                            alphas_indices[mask2])
+                            alphas_indices[mask2],
+                        )
                         # update corresponding weights
                         mask_target = backend.arange(weights.shape[2])
                         mask_target = backend.to_gpu(mask_target)[mask2]
                         tmp = weights[alphas_indices, :, mask_target]
-                        primal_weights[:, batch][:, backend.to_cpu(mask2)] = \
-                            backend.to_cpu(tmp).T
+                        primal_weights[:, batch][
+                            :, backend.to_cpu(mask2)
+                        ] = backend.to_cpu(tmp).T
                         del weights, alphas_indices, mask2, mask_target
                     del matrix
 
@@ -352,7 +380,8 @@ def solve_group_ridge_random_search(
                 # on the scaled features (np.sqrt(g) * Xs)
                 for kk in range(n_spaces):
                     primal_weights[slices[kk]] *= backend.to_cpu(
-                        backend.sqrt(gamma[kk]))
+                        backend.sqrt(gamma[kk])
+                    )
                 refit_weights[:, backend.to_cpu(mask)] = primal_weights
                 del primal_weights
 
@@ -361,25 +390,32 @@ def solve_group_ridge_random_search(
 
         for kk in range(n_spaces):
             X_[:, slices[kk]] /= backend.sqrt(gamma[kk])
-            
-    #warning when best_alpha is at the edge of the range
+
+    # warning when best_alpha is at the edge of the range
     for index, best_alpha in enumerate(best_alphas):
-        #TODO: not allclose, should be relative
-        if backend.allclose(best_alpha,alphas[0]) or backend.allclose(best_alpha,alphas[-1]):
-            print(f'Warning: best alpha for target{index} is {best_alpha}, which is at the edge of the range')
+        # TODO: not allclose, should be relative
+        if backend.allclose(best_alpha, alphas[0]) or backend.allclose(
+            best_alpha, alphas[-1]
+        ):
+            print(
+                f"Warning: best alpha for target{index} is {best_alpha}, which is at the edge of the range"
+            )
     deltas = backend.log(best_gammas / best_alphas[None, :])
 
     if fit_intercept:
-        intercept = (backend.to_cpu(Y_offset) -
-                     backend.to_cpu(X_offset) @ refit_weights
-                     ) if return_weights else None
+        intercept = (
+            (backend.to_cpu(Y_offset) - backend.to_cpu(X_offset) @ refit_weights)
+            if return_weights
+            else None
+        )
         return deltas, refit_weights, cv_scores, intercept
     else:
         return deltas, refit_weights, cv_scores
 
 
-def _decompose_ridge(Xtrain, alphas, n_alphas_batch=None, method="svd",
-                     negative_eigenvalues="zeros"):
+def _decompose_ridge(
+    Xtrain, alphas, n_alphas_batch=None, method="svd", negative_eigenvalues="zeros"
+):
     """Precompute resolution matrices for ridge predictions.
 
     To compute the prediction::
@@ -428,19 +464,20 @@ def _decompose_ridge(Xtrain, alphas, n_alphas_batch=None, method="svd",
         # SVD: X = U @ np.diag(eigenvalues) @ Vt
         U, eigenvalues, Vt = backend.svd(Xtrain, full_matrices=False)
     else:
-        raise ValueError("Unknown method=%r." % (method, ))
+        raise ValueError("Unknown method=%r." % (method,))
 
     for start in range(0, len(alphas), n_alphas_batch):
         batch = slice(start, start + n_alphas_batch)
 
-        ev_weighting = eigenvalues / (alphas[batch, None] + eigenvalues ** 2)
+        ev_weighting = eigenvalues / (alphas[batch, None] + eigenvalues**2)
 
         # negative eigenvalues can emerge from incorrect kernels,
         # or from float32
         if eigenvalues[0] < 0:
             if negative_eigenvalues == "nan":
-                ev_weighting[alphas[batch] < -eigenvalues[0] * 2, :] = \
-                    backend.asarray(backend.nan, type=ev_weighting.dtype)
+                ev_weighting[alphas[batch] < -eigenvalues[0] * 2, :] = backend.asarray(
+                    backend.nan, type=ev_weighting.dtype
+                )
 
             elif negative_eigenvalues == "zeros":
                 eigenvalues[eigenvalues < 0] = 0
@@ -449,10 +486,12 @@ def _decompose_ridge(Xtrain, alphas, n_alphas_batch=None, method="svd",
                 raise RuntimeError(
                     "Negative eigenvalues. Make sure the kernel is positive "
                     "semi-definite, increase the regularization alpha, or use"
-                    "another solver.")
+                    "another solver."
+                )
             else:
-                raise ValueError("Unknown negative_eigenvalues=%r." %
-                                 (negative_eigenvalues, ))
+                raise ValueError(
+                    "Unknown negative_eigenvalues=%r." % (negative_eigenvalues,)
+                )
 
         matrices = backend.matmul(Vt.T, ev_weighting[:, :, None] * U.T)
 
@@ -470,11 +509,22 @@ GROUP_RIDGE_SOLVERS = {
 }
 
 
-def solve_ridge_cv_svd(X, Y, alphas=1.0, fit_intercept=False,
-                       score_func=l2_neg_loss, cv=5, local_alpha=True,
-                       n_targets_batch=None, n_targets_batch_refit=None,
-                       n_alphas_batch=None, conservative=False, Y_in_cpu=False,
-                       warn=True,nsample_large=False):
+def solve_ridge_cv_svd(
+    X,
+    Y,
+    alphas=1.0,
+    fit_intercept=False,
+    score_func=l2_neg_loss,
+    cv=5,
+    local_alpha=True,
+    n_targets_batch=None,
+    n_targets_batch_refit=None,
+    n_alphas_batch=None,
+    conservative=False,
+    Y_in_cpu=False,
+    warn=True,
+    nsample_large=False,
+):
     """Solve ridge regression with a grid search over alphas.
 
     Parameters
@@ -534,22 +584,36 @@ def solve_ridge_cv_svd(X, Y, alphas=1.0, fit_intercept=False,
             f"< n_features (here {n_samples} < {n_features}). "
             "Using a linear kernel in himalaya.kernel_ridge.KernelRidgeCV or "
             "himalaya.kernel_ridge.solve_kernel_ridge_cv_eigenvalues would be "
-            "faster. Use warn=False to silence this warning.", UserWarning)
+            "faster. Use warn=False to silence this warning.",
+            UserWarning,
+        )
 
     n_iter = backend.ones_like(X, shape=(1, 1))
-    fixed_params = dict(return_weights=True, progress_bar=False,
-                        concentration=None, jitter_alphas=False,
-                        random_state=None, n_iter=n_iter, warn=False)
+    fixed_params = dict(
+        return_weights=True,
+        progress_bar=False,
+        concentration=None,
+        jitter_alphas=False,
+        random_state=None,
+        n_iter=n_iter,
+        warn=False,
+    )
 
-    copied_params = dict(alphas=alphas, score_func=score_func, cv=cv,
-                         local_alpha=local_alpha, fit_intercept=fit_intercept,
-                         n_targets_batch=n_targets_batch,
-                         n_targets_batch_refit=n_targets_batch_refit,
-                         n_alphas_batch=n_alphas_batch,
-                         conservative=conservative, Y_in_cpu=Y_in_cpu,nsample_large=nsample_large)
+    copied_params = dict(
+        alphas=alphas,
+        score_func=score_func,
+        cv=cv,
+        local_alpha=local_alpha,
+        fit_intercept=fit_intercept,
+        n_targets_batch=n_targets_batch,
+        n_targets_batch_refit=n_targets_batch_refit,
+        n_alphas_batch=n_alphas_batch,
+        conservative=conservative,
+        Y_in_cpu=Y_in_cpu,
+        nsample_large=nsample_large,
+    )
 
-    tmp = solve_group_ridge_random_search([X], Y, **copied_params,
-                                          **fixed_params)
+    tmp = solve_group_ridge_random_search([X], Y, **copied_params, **fixed_params)
 
     if fit_intercept:
         deltas, coefs, cv_scores, intercept = tmp

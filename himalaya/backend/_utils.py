@@ -3,13 +3,7 @@ import importlib
 import warnings
 from functools import wraps
 
-ALL_BACKENDS = [
-    "numpy",
-    "cupy",
-    "torch",
-    "torch_cuda",
-    "dask"
-]
+ALL_BACKENDS = ["numpy", "cupy", "torch", "torch_cuda", "torch_mps", "dask"]
 
 CURRENT_BACKEND = "numpy"
 
@@ -18,6 +12,7 @@ MATCHING_CPU_BACKEND = {
     "cupy": "numpy",
     "torch": "torch",
     "torch_cuda": "torch",
+    "torch_mps": "torch",
 }
 
 
@@ -45,7 +40,7 @@ def set_backend(backend, on_error="raise"):
             backend = backend.name
 
         if backend not in ALL_BACKENDS:
-            raise ValueError("Unknown backend=%r" % (backend, ))
+            raise ValueError("Unknown backend=%r" % (backend,))
 
         module = importlib.import_module(__package__ + "." + backend)
         CURRENT_BACKEND = backend
@@ -53,11 +48,13 @@ def set_backend(backend, on_error="raise"):
         if on_error == "raise":
             raise error
         elif on_error == "warn":
-            warnings.warn(f"Setting backend to {backend} failed: {str(error)}."
-                          f"Falling back to {CURRENT_BACKEND} backend.")
+            warnings.warn(
+                f"Setting backend to {backend} failed: {str(error)}."
+                f"Falling back to {CURRENT_BACKEND} backend."
+            )
             module = get_backend()
         else:
-            raise ValueError('Unknown value on_error=%r' % (on_error, ))
+            raise ValueError("Unknown value on_error=%r" % (on_error,))
 
     return module
 
@@ -120,8 +117,7 @@ def _add_error_message(func, msg=""):
         try:
             return func(*args, **kwargs)
         except Exception as e:
-            raise RuntimeError(
-                f"{msg}\nOriginal error:\n{type(e).__name__}: {e}")
+            raise RuntimeError(f"{msg}\nOriginal error:\n{type(e).__name__}: {e}")
 
     return with_error_message
 
@@ -139,5 +135,7 @@ def warn_if_not_float32(dtype):
         warnings.warn(
             f"GPU backend {backend.name} is much faster with single "
             f"precision floats (float32), got input in {dtype}. "
-            "Consider casting your data to float32.", UserWarning)
+            "Consider casting your data to float32.",
+            UserWarning,
+        )
         _already_warned[0] = True
