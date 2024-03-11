@@ -143,7 +143,8 @@ def solve_group_ridge_random_search(
     gammas = backend.asarray(gammas, dtype=dtype)
     device = getattr(gammas, "device", None)
     gammas, alphas = backend.check_arrays(gammas, alphas)
-    Y = backend.asarray(Y, dtype=dtype, device="cpu" if Y_in_cpu else device)
+    Y = backend.asarray(Y, dtype=dtype, device="cpu")
+    # Xs = [backend.asarray(X, dtype=dtype, device="cpu") for X in Xs]
     Xs = [backend.asarray(X, dtype=dtype, device=device) for X in Xs]
 
     # stack all features
@@ -235,7 +236,8 @@ def solve_group_ridge_random_search(
                 Xtrain_mean = X_[train].mean(0)
                 Xtrain = X_[train] - Xtrain_mean
                 Xtest = X_[test] - Xtrain_mean
-
+            train = backend.to_gpu(train, device=Y.device)
+            test = backend.to_gpu(test, device=Y.device)
             for matrix, alpha_batch in _decompose_ridge(
                 Xtrain=Xtrain,
                 alphas=alphas,
@@ -369,9 +371,9 @@ def solve_group_ridge_random_search(
                         mask_target = backend.arange(weights.shape[2])
                         mask_target = backend.to_gpu(mask_target)[mask2]
                         tmp = weights[alphas_indices, :, mask_target]
-                        primal_weights[:, batch][
-                            :, backend.to_cpu(mask2)
-                        ] = backend.to_cpu(tmp).T
+                        primal_weights[:, batch][:, backend.to_cpu(mask2)] = (
+                            backend.to_cpu(tmp).T
+                        )
                         del weights, alphas_indices, mask2, mask_target
                     del matrix
 
@@ -403,12 +405,19 @@ def solve_group_ridge_random_search(
     deltas = backend.log(best_gammas / best_alphas[None, :])
 
     if fit_intercept:
-        intercept = (backend.to_cpu(Y_offset) -
-                     backend.to_cpu(X_offset) @ refit_weights
-                     ) if return_weights else None
-        return deltas, refit_weights, scores, intercept,
+        intercept = (
+            (backend.to_cpu(Y_offset) - backend.to_cpu(X_offset) @ refit_weights)
+            if return_weights
+            else None
+        )
+        return (
+            deltas,
+            refit_weights,
+            scores,
+            intercept,
+        )
     else:
-        return deltas, refit_weights,scores
+        return deltas, refit_weights, scores
 
 
 def _decompose_ridge(
@@ -614,10 +623,15 @@ def solve_ridge_cv_svd(
     tmp = solve_group_ridge_random_search([X], Y, **copied_params, **fixed_params)
 
     if fit_intercept:
-        deltas, coefs, scores, intercept, = tmp
+        (
+            deltas,
+            coefs,
+            scores,
+            intercept,
+        ) = tmp
         best_alphas = backend.exp(-deltas[0])
         return best_alphas, coefs, scores, intercept
     else:
         deltas, coefs, scores = tmp
         best_alphas = backend.exp(-deltas[0])
-        return best_alphas, coefs,scores
+        return best_alphas, coefs, scores
