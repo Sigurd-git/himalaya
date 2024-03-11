@@ -143,8 +143,7 @@ def solve_group_ridge_random_search(
     gammas = backend.asarray(gammas, dtype=dtype)
     device = getattr(gammas, "device", None)
     gammas, alphas = backend.check_arrays(gammas, alphas)
-    Y = backend.asarray(Y, dtype=dtype, device="cpu")
-    # Xs = [backend.asarray(X, dtype=dtype, device="cpu") for X in Xs]
+    Y = backend.asarray(Y, dtype=dtype, device=Y.device)
     Xs = [backend.asarray(X, dtype=dtype, device=device) for X in Xs]
 
     # stack all features
