@@ -246,10 +246,6 @@ def solve_group_ridge_random_search(
             ):
                 # n_alphas_batch, n_features, n_samples_train = \
                 # matrix.shape
-                if backend.name == "dask":
-                    matrix = da.from_array(
-                        matrix, chunks=(n_alphas_batch, n_features, "1000")
-                    )
                 if not nsample_large:
                     matrix = backend.matmul(Xtest, matrix)
                     # n_alphas_batch, n_samples_test, n_samples_train = \
