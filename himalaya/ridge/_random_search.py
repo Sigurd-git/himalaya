@@ -326,8 +326,8 @@ def solve_group_ridge_random_search(
         # compute primal or dual weights on the entire dataset (nocv)
         if return_weights:
             update_indices = backend.flatnonzero(mask)
-            if Y_in_cpu:
-                update_indices = backend.to_cpu(update_indices)
+
+            update_indices = backend.to_gpu(update_indices, device=Y.device)
             if len(update_indices) > 0:
                 # refit weights only for alphas used by at least one target
                 used_alphas = backend.unique(best_alphas[mask])
