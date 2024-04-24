@@ -444,7 +444,7 @@ def _decompose_ridge(
         If the decomposition leads to negative eigenvalues (wrongly emerging
         from float32 errors):
             - "error" raises an error.
-            - "zeros" remplaces them with zeros.
+            - "zeros" replaces them with zeros.
             - "nan" returns nans if the regularization does not compensate
                 twice the smallest negative value, else it ignores the problem.
 
