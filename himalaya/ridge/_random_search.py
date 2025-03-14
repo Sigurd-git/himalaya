@@ -388,6 +388,7 @@ def solve_group_ridge_random_search(
                                 matrix_,
                                 Y_target[~nan_sample],
                             )
+                            del matrix_
                         # select alphas corresponding to best cv_score
                         alphas_indices = backend.searchsorted(
                             used_alphas, best_alphas[mask][batch]
@@ -411,7 +412,7 @@ def solve_group_ridge_random_search(
                             backend.to_cpu(tmp).T
                         )
                         del weights, alphas_indices, mask2, mask_target
-                    del matrix, matrix_
+                    del matrix
 
                 # multiply again by np.sqrt(g), as we then want to use
                 # the primal weights on the unscaled features Xs, and not
