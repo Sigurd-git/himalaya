@@ -112,7 +112,8 @@ atleast_1d = np.atleast_1d
 finfo = np.finfo
 eye = np.eye
 allclose = np.allclose
-
+nanmean = np.nanmean
+nansum = np.nansum
 
 def diagonal_view(array, axis1=0, axis2=1):
     """Return a view of the array diagonal"""

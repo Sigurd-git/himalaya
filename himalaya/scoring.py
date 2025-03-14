@@ -21,14 +21,15 @@ def l2_neg_loss(y_true, y_pred):
     """
     backend = get_backend()
     y_true, y_pred = backend.check_arrays(y_true, y_pred)
-    y_pred = _check_finite(y_pred)
+    # y_pred = _check_finite(y_pred)
 
     # broadcasting if y_pred has more dimensions
     axis = 1 if len(y_pred.shape) > len(y_true.shape) else 0
     n_samples = y_true.shape[0]
 
-    error = ((y_true - y_pred) ** 2).sum(axis)
-    l2 = -error / n_samples
+    error = backend.nansum((y_true - y_pred) ** 2, axis)
+    n_nan = backend.sum(backend.isnan(y_true - y_pred), axis)
+    l2 = -error / (n_samples - n_nan)
 
     return l2
 
@@ -58,7 +59,7 @@ def r2_score(y_true, y_pred):
 
     error = ((y_true - y_pred) ** 2).sum(axis)
     var = ((y_true - y_true.mean(0)) ** 2).sum(0)
-    r2 = 1. - error / var
+    r2 = 1.0 - error / var
     if axis == 0:
         r2[var == 0] = 0
     else:
@@ -147,10 +148,11 @@ def r2_score_split(y_true, y_pred, include_correlation=True):
 
     if backend.any(backend.abs(y_true.mean(0)) > 1e-6):
         warnings.warn(
-            'y_true has to be zero-mean over samples to compute '
-            'the split r2 scores.', UserWarning)
+            "y_true has to be zero-mean over samples to compute the split r2 scores.",
+            UserWarning,
+        )
 
-    sst = (y_true ** 2).sum(0)
+    sst = (y_true**2).sum(0)
 
     no_split = y_pred.ndim == 2
     if no_split:
@@ -163,7 +165,7 @@ def r2_score_split(y_true, y_pred, include_correlation=True):
         if include_correlation:
             asst = (y_pred[fsi] * y_pred).sum(0)
         else:
-            asst = (y_pred[fsi] ** 2)
+            asst = y_pred[fsi] ** 2
 
         inter = y_true * y_pred[fsi]
         r2[fsi, :] = ((2 * inter - asst) / sst).sum(0)
@@ -218,8 +220,9 @@ def r2_score_split_svd(y_true, y_pred):
 
     if backend.any(backend.abs(y_true.mean(0)) > 1e-6):
         warnings.warn(
-            'y_true has to be zero-mean over samples to compute '
-            'the split r2 scores.', UserWarning)
+            "y_true has to be zero-mean over samples to compute the split r2 scores.",
+            UserWarning,
+        )
 
     no_split = y_pred.ndim == 2
     if no_split:
@@ -240,8 +243,7 @@ def r2_score_split_svd(y_true, y_pred):
 
     # Compute the singular value decomposition. It is done on non-normalized
     # y_pred to preserve the scaling of sub-predictions.
-    U, s, Vt = backend.svd(backend.transpose(y_pred, (2, 1, 0)),
-                           full_matrices=False)
+    U, s, Vt = backend.svd(backend.transpose(y_pred, (2, 1, 0)), full_matrices=False)
     V = backend.transpose(Vt, (0, 2, 1))
     Ut = backend.transpose(U, (0, 2, 1))
 
@@ -253,8 +255,7 @@ def r2_score_split_svd(y_true, y_pred):
     # Aggregates VsVt and beta to compute the relative weights. It uses a
     # scaling by norms_pred because the SVD was computed on non-normalized
     # y_pred.
-    r2 = backend.matmul(VsVt ** 2 / norms_pred.T[:, None, :] ** 2,
-                        beta ** 2)[:, :, 0].T
+    r2 = backend.matmul(VsVt**2 / norms_pred.T[:, None, :] ** 2, beta**2)[:, :, 0].T
 
     # fix rounding errors
     r2 /= r2.sum(0)[None, :]
@@ -313,11 +314,9 @@ def correlation_score_split(y_true, y_pred):
     if split:
         y_true = y_true[None]
         y_pred_sum = y_pred.sum(0, keepdims=True)
-        y_pred_std = backend.std_float64(y_pred_sum, axis, demean=True,
-                                         keepdims=False)
+        y_pred_std = backend.std_float64(y_pred_sum, axis, demean=True, keepdims=False)
     else:
-        y_pred_std = backend.std_float64(y_pred, axis, demean=True,
-                                         keepdims=True)
+        y_pred_std = backend.std_float64(y_pred, axis, demean=True, keepdims=True)
     y_pred_std[y_pred_std == 0] = 1
     correlations = (y_true * y_pred).mean(axis) / (y_true_std * y_pred_std)
     if not split:
@@ -333,12 +332,12 @@ def _check_finite(y_pred):
 
     is_nan = backend.isnan(y_pred)
     if backend.any(is_nan):
-        warnings.warn('nan in y_pred.')
+        warnings.warn("nan in y_pred.")
         y_pred[is_nan] = 0
 
     isinf = backend.isinf(y_pred)
     if backend.any(isinf):
-        warnings.warn('inf in y_pred.')
+        warnings.warn("inf in y_pred.")
         y_pred[isinf] = 0
 
     return y_pred

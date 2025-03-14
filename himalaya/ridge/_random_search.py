@@ -173,7 +173,7 @@ def solve_group_ridge_random_search(
     X_offset, Y_offset = None, None
     if fit_intercept:
         X_offset = X_.mean(0)
-        Y_offset = Y.mean(0)
+        Y_offset = backend.nanmean(Y, 0)
         X_ = X_ - X_offset
         Y = Y - Y_offset
 
@@ -190,8 +190,7 @@ def solve_group_ridge_random_search(
     for train, val in cv.split(Y):
         if len(val) == 0 or len(train) == 0:
             raise ValueError(
-                "Empty train or validation set. "
-                "Check that `cv` is correctly defined."
+                "Empty train or validation set. Check that `cv` is correctly defined."
             )
 
     random_generator, given_alphas = None, None
@@ -257,7 +256,7 @@ def solve_group_ridge_random_search(
                         Ytrain = backend.to_gpu(Y[:, batch][train], device=device)
                         Ytest = backend.to_gpu(Y[:, batch][test], device=device)
                         if fit_intercept:
-                            Ytrain_mean = Ytrain.mean(0)
+                            Ytrain_mean = backend.nanmean(Ytrain, 0)
                             Ytrain = Ytrain - Ytrain_mean
                             Ytest = Ytest - Ytrain_mean
 
@@ -278,7 +277,7 @@ def solve_group_ridge_random_search(
                         Ytrain = backend.to_gpu(Y[:, batch][train], device=device)
                         Ytest = backend.to_gpu(Y[:, batch][test], device=device)
                         if fit_intercept:
-                            Ytrain_mean = Ytrain.mean(0)
+                            Ytrain_mean = backend.nanmean(Ytrain, 0)
                             Ytrain = Ytrain - Ytrain_mean
                             Ytest = Ytest - Ytrain_mean
 
@@ -286,6 +285,28 @@ def solve_group_ridge_random_search(
                         # n_alphas_batch, n_features, n_targets_batch = \
                         # predictions.shape
                         predictions = backend.matmul(Xtest, predictions)
+
+                        # handle nan in Ytrain
+                        # find the target with nan
+                        nan_target = backend.isnan(Ytrain).any(0)
+                        n_nan_target = backend.sum(nan_target)
+                        if nan_target.any():
+                            Y_target = Ytrain[:, nan_target].reshape(-1, n_nan_target)
+                            nan_sample = backend.isnan(Y_target).any(1)
+                            matrix, _ = list(
+                                _decompose_ridge(
+                                    Xtrain=Xtrain[~nan_sample, :],
+                                    alphas=alphas[alpha_batch],
+                                    n_alphas_batch=len(alphas[alpha_batch]),
+                                    negative_eigenvalues="nan",
+                                    method=diagonalize_method,
+                                )
+                            )[0]
+                            predictions[:, :, nan_target] = backend.matmul(
+                                Xtest,
+                                backend.matmul(matrix, Y_target[~nan_sample]),
+                            )
+
                         # n_alphas_batch, n_samples_test, n_targets_batch = \
                         # predictions.shape
                         with warnings.catch_warnings():
@@ -339,14 +360,34 @@ def solve_group_ridge_random_search(
                 ):
                     for start in range(0, len(update_indices), n_targets_batch_refit):
                         batch = slice(start, start + n_targets_batch_refit)
-
+                        Y_batch = backend.to_gpu(
+                            Y[:, update_indices[batch]], device=device
+                        )
                         weights = backend.matmul(
                             matrix,
-                            backend.to_gpu(Y[:, update_indices[batch]], device=device),
+                            Y_batch,
                         )
                         # used_n_alphas_batch, n_features, n_targets_batch = \
                         # weights.shape
 
+                        nan_target = backend.isnan(Y_batch).any(0)
+                        n_nan_target = backend.sum(nan_target)
+                        if nan_target.any():
+                            Y_target = Y_batch[:, nan_target].reshape(-1, n_nan_target)
+                            nan_sample = backend.isnan(Y_target).any(1)
+                            matrix_, _ = list(
+                                _decompose_ridge(
+                                    Xtrain=X_[~nan_sample],
+                                    alphas=used_alphas[alpha_batch],
+                                    n_alphas_batch=len(used_alphas[alpha_batch]),
+                                    negative_eigenvalues="nan",
+                                    method=diagonalize_method,
+                                )
+                            )[0]
+                            weights[:, :, nan_target] = backend.matmul(
+                                matrix_,
+                                Y_target[~nan_sample],
+                            )
                         # select alphas corresponding to best cv_score
                         alphas_indices = backend.searchsorted(
                             used_alphas, best_alphas[mask][batch]
@@ -370,7 +411,7 @@ def solve_group_ridge_random_search(
                             backend.to_cpu(tmp).T
                         )
                         del weights, alphas_indices, mask2, mask_target
-                    del matrix
+                    del matrix, matrix_
 
                 # multiply again by np.sqrt(g), as we then want to use
                 # the primal weights on the unscaled features Xs, and not
@@ -391,12 +432,13 @@ def solve_group_ridge_random_search(
     # warning when best_alpha is at the edge of the range
     for index, best_alpha in enumerate(best_alphas):
         # TODO: not allclose, should be relative
-        if backend.allclose(best_alpha, alphas[0]) or backend.allclose(
-            best_alpha, alphas[-1]
-        ):
-            print(
-                f"Warning: best alpha for target{index} is {best_alpha}, which is at the edge of the range"
-            )
+        if len(alphas) > 1:
+            if backend.allclose(best_alpha, alphas[0]) or backend.allclose(
+                best_alpha, alphas[-1]
+            ):
+                print(
+                    f"Warning: best alpha for target{index} is {best_alpha}, which is at the edge of the range"
+                )
     deltas = backend.log(best_gammas / best_alphas[None, :])
 
     if fit_intercept:

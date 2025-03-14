@@ -143,7 +143,8 @@ clip = torch.clamp
 finfo = torch.finfo
 eye = torch.eye
 allclose = torch.allclose
-
+nanmean = torch.nanmean
+nansum = torch.nansum
 
 def atleast_1d(array):
     array = asarray(array)

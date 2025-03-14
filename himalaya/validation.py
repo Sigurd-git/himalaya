@@ -162,7 +162,6 @@ def check_array(array, accept_sparse=False, dtype=["float32", "float64"],
         elif copy and not changed_format:
             array = array.copy()
 
-        _assert_all_finite(array.data, force_all_finite, numpy=True)
 
     ############
     # dense case
@@ -196,8 +195,6 @@ def check_array(array, accept_sparse=False, dtype=["float32", "float64"],
             if array.__array_interface__['data'][0] % 8 != 0:
                 array = backend.copy(array)
 
-        numpy = backend.name == 'cupy' and device == "cpu"
-        _assert_all_finite(array, force_all_finite, numpy=numpy)
 
     #####################
     # check minimum sizes
