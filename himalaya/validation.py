@@ -2,7 +2,7 @@ import numbers
 import warnings
 
 import numpy as np
-from numpy.core.numeric import ComplexWarning
+from numpy.exceptions import ComplexWarning
 
 try:
     from scipy.sparse import issparse
@@ -36,13 +36,22 @@ def check_random_state(seed):
         return np.random.RandomState(seed)
     if isinstance(seed, np.random.RandomState):
         return seed
-    raise ValueError('%r cannot be used to seed a numpy.random.RandomState'
-                     ' instance' % seed)
+    raise ValueError(
+        "%r cannot be used to seed a numpy.random.RandomState instance" % seed
+    )
 
 
-def check_array(array, accept_sparse=False, dtype=["float32", "float64"],
-                copy=False, force_all_finite=True, ndim=2,
-                ensure_min_samples=1, ensure_min_features=1, device="default"):
+def check_array(
+    array,
+    accept_sparse=False,
+    dtype=["float32", "float64"],
+    copy=False,
+    force_all_finite=True,
+    ndim=2,
+    ensure_min_samples=1,
+    ensure_min_features=1,
+    device="default",
+):
     """Input validation on an array, list, sparse matrix or similar.
 
     By default, the input is checked to be a non-empty 2D array containing
@@ -129,8 +138,7 @@ def check_array(array, accept_sparse=False, dtype=["float32", "float64"],
         kwargs = dict()
 
     if array is None:
-        raise ValueError(
-            "Expected array-like (array or non-string sequence), got None")
+        raise ValueError("Expected array-like (array or non-string sequence), got None")
 
     #############
     # sparse case
@@ -140,39 +148,43 @@ def check_array(array, accept_sparse=False, dtype=["float32", "float64"],
         if isinstance(accept_sparse, str):
             accept_sparse = [accept_sparse]
         if accept_sparse is False:
-            raise TypeError('A sparse matrix was passed, but dense '
-                            'data is required. Use X.toarray() to '
-                            'convert to a dense numpy array.')
+            raise TypeError(
+                "A sparse matrix was passed, but dense "
+                "data is required. Use X.toarray() to "
+                "convert to a dense numpy array."
+            )
         elif isinstance(accept_sparse, (list, tuple)):
             if len(accept_sparse) == 0:
-                raise ValueError("When providing 'accept_sparse' "
-                                 "as a tuple or list, it must contain at "
-                                 "least one string value.")
+                raise ValueError(
+                    "When providing 'accept_sparse' "
+                    "as a tuple or list, it must contain at "
+                    "least one string value."
+                )
             # ensure correct sparse format
             if array.format not in accept_sparse:
                 array = array.asformat(accept_sparse[0])
                 changed_format = True
         elif accept_sparse is not True:
-            raise ValueError("Parameter 'accept_sparse' should be a string, "
-                             "boolean or list of strings. You provided "
-                             "'accept_sparse={}'.".format(accept_sparse))
+            raise ValueError(
+                "Parameter 'accept_sparse' should be a string, "
+                "boolean or list of strings. You provided "
+                "'accept_sparse={}'.".format(accept_sparse)
+            )
 
         if dtype != dtype_input:
             array = array.astype(dtype)
         elif copy and not changed_format:
             array = array.copy()
 
-
     ############
     # dense case
     else:
-
-        if hasattr(array, 'dtype') and "complex" in str(array.dtype):
+        if hasattr(array, "dtype") and "complex" in str(array.dtype):
             raise ValueError("Complex data not supported.")
         # convert ComplexWarning into error
         with warnings.catch_warnings():
             try:
-                warnings.simplefilter('error', ComplexWarning)
+                warnings.simplefilter("error", ComplexWarning)
                 ################
                 array = backend.asarray(array, dtype=dtype, **kwargs)
                 ################
@@ -183,18 +195,18 @@ def check_array(array, accept_sparse=False, dtype=["float32", "float64"],
             array = backend.copy(array)
 
         if ndim is not None and array.ndim not in np.atleast_1d(ndim):
-            raise ValueError("Found array with ndim %d, expected %s. "
-                             "Reshape your data or change the input." %
-                             (array.ndim, ndim))
+            raise ValueError(
+                "Found array with ndim %d, expected %s. "
+                "Reshape your data or change the input." % (array.ndim, ndim)
+            )
 
         # copy misaligned arrays, as it can lead to segmentation faults
         if hasattr(array, "data_ptr"):
             if array.data_ptr() % 8 != 0:
                 array = backend.copy(array)
         if hasattr(array, "__array_interface__"):
-            if array.__array_interface__['data'][0] % 8 != 0:
+            if array.__array_interface__["data"][0] % 8 != 0:
                 array = backend.copy(array)
-
 
     #####################
     # check minimum sizes
@@ -203,21 +215,23 @@ def check_array(array, accept_sparse=False, dtype=["float32", "float64"],
         if n_samples < ensure_min_samples:
             raise ValueError(
                 "Found array with %d sample(s) (shape=%s) while a"
-                " minimum of %d is required." %
-                (n_samples, tuple(array.shape), ensure_min_samples))
+                " minimum of %d is required."
+                % (n_samples, tuple(array.shape), ensure_min_samples)
+            )
 
     if ensure_min_features > 0 and array.ndim == 2:
         n_features = array.shape[1]
         if n_features < ensure_min_features:
             raise ValueError(
                 "Found array with %d feature(s) (shape=%s) while"
-                " a minimum of %d is required." %
-                (n_features, tuple(array.shape), ensure_min_features))
+                " a minimum of %d is required."
+                % (n_features, tuple(array.shape), ensure_min_features)
+            )
 
     return array
 
 
-def _assert_all_finite(X, force_all_finite, numpy=False, batch_size=2 ** 24):
+def _assert_all_finite(X, force_all_finite, numpy=False, batch_size=2**24):
     """Check infinity and NaNs in X.
 
     Parameters
@@ -242,18 +256,20 @@ def _assert_all_finite(X, force_all_finite, numpy=False, batch_size=2 ** 24):
     else:
         backend = get_backend()
 
-    if get_config()['assume_finite']:
+    if get_config()["assume_finite"]:
         return
 
-    if force_all_finite not in (True, False, 'allow-nan'):
-        raise ValueError('force_all_finite should be a bool or "allow-nan"'
-                         '. Got {!r} instead'.format(force_all_finite))
+    if force_all_finite not in (True, False, "allow-nan"):
+        raise ValueError(
+            'force_all_finite should be a bool or "allow-nan". Got {!r} instead'.format(
+                force_all_finite
+            )
+        )
     if not force_all_finite:
         return
 
     X_dtype = _get_string_dtype(X)
-    msg = ("Input contains NaN, infinity or a value too large for "
-           "dtype(%r)." % X_dtype)
+    msg = "Input contains NaN, infinity or a value too large for dtype(%r)." % X_dtype
 
     for start in range(0, np.prod(X.shape), batch_size):
         batch = slice(start, start + batch_size)
@@ -261,8 +277,7 @@ def _assert_all_finite(X, force_all_finite, numpy=False, batch_size=2 ** 24):
 
         if backend.any(backend.isinf(X_batch)):
             raise ValueError(msg)
-        if force_all_finite != 'allow_nan' and backend.any(
-                backend.isnan(X_batch)):
+        if force_all_finite != "allow_nan" and backend.any(backend.isnan(X_batch)):
             raise ValueError(msg)
 
 

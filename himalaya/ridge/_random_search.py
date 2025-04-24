@@ -1,6 +1,5 @@
 import warnings
 import numbers
-import dask.array as da
 import numpy as np
 
 from ..backend import get_backend

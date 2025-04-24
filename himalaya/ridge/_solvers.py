@@ -134,6 +134,7 @@ def solve_ridge_svd(
             weights_batch_not_nan = (
                 Vt.T @ (iUT[~nan_targets] @ Y.T[~nan_targets, :, None])[:, :, 0].T
             )
+        weights[:, ~nan_targets] = backend.to_cpu(weights_batch_not_nan)
         if nan_targets.any():
             nan_samples = backend.isnan(Y[:, nan_targets]).any(1)
             U, eigenvalues, Vt = backend.svd(X[~nan_samples], full_matrices=False)
@@ -151,9 +152,8 @@ def solve_ridge_svd(
                         :, :, 0
                     ].T
                 )
+            weights[:, nan_targets] = backend.to_cpu(weights_batch_nan)
 
-        weights[:, ~nan_targets] = backend.to_cpu(weights_batch_not_nan)
-        weights[:, nan_targets] = backend.to_cpu(weights_batch_nan)
     if fit_intercept:
         intercept = backend.to_cpu(Y_offset) - backend.to_cpu(X_offset) @ weights
         return weights, intercept
